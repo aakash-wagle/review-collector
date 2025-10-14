@@ -11,3 +11,4 @@ keys.txt
 
 # Virtual environments
 .venv
+venv_analysis/
