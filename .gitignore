@@ -1,13 +1,68 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 wheels/
-*.egg-info
-keys.txt
-.env
-
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Virtual environments
-.venv
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cache
+cache/
+*.sqlite
+*.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data files (optional - remove if you want to track processed data)
+# data/processed/
+# outputs/
+
+# Logs
+*.log
+outputs/run_logs.txt
+
+# Reports (optional - remove if you want to track the PDF)
+# REPORT_2PAGES.pdf
+
+# pyproject and lock files
+pyproject.toml
+uv.lock
+.python-version

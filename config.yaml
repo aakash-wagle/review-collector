@@ -1,0 +1,115 @@
+# iPhone 17 Pro Max Reviews Analysis - Configuration
+project:
+  name: "iPhone 17 Pro Max Reviews – Multilingual Analysis"
+  objective: "Clean, translate, and analyze Google reviews"
+
+environment:
+  python: "3.11"
+  venv_required: true
+
+data:
+  raw_csv: "data/raw/reviews.csv"
+  raw_columns: ["review_text", "stars", "date"]
+  processed_dir: "data/processed"
+  outputs_dir: "outputs"
+  cache_dir: "cache"
+
+config:
+  seeds:
+    numpy: 42
+    sklearn: 42
+  
+  stars:
+    regex_patterns:
+      - "([0-9]+(?:\\.[0-9]+)?)\\s*out of\\s*([0-9]+(?:\\.[0-9]+)?)"
+      - "\\b([0-9]+(?:\\.[0-9]+)?)/([0-9]+(?:\\.[0-9]+)?)\\b"
+    normalize_to_scale: 5
+    clip_range: [1, 5]
+  
+  time:
+    recent_months: 5
+    rolling_window_days: 30
+  
+  translation:
+    enabled: true
+    mode: "auto"
+    local_model: "facebook/m2m100_418M"
+    api_provider: "google-translate"
+    cache: true
+    back_translation_qc:
+      enabled: true
+      sample_size: 200
+      polarity_flip_flag: true
+  
+  normalization:
+    lowercase: true
+    demojize: true
+    strip_urls_html_handles: true
+    expand_contractions: true
+    lemmatize: true
+    low_info_word_threshold: 5
+  
+  sentiment:
+    vader:
+      enabled: true
+      thresholds:
+        neg: -0.05
+        pos: 0.05
+    transformer:
+      enabled: false
+      model: "cardiffnlp/twitter-roberta-base-sentiment-latest"
+  
+  topics:
+    method: "kmeans"
+    tfidf:
+      ngram_range: [1, 2]
+      min_df: 5
+      max_features: 10000
+    kmeans:
+      k_min: 6
+      k_max: 12
+      selection_metric: "silhouette"
+  
+  aspects:
+    catalog:
+      - "Battery"
+      - "Performance/Overheating"
+      - "Camera"
+      - "Display"
+      - "Durability/Build"
+      - "Charging/USB-C"
+      - "iOS/Software"
+      - "Price/Value"
+      - "Weight/Ergonomics"
+    dictionary_match:
+      enabled: true
+  
+  agentic:
+    enabled: true
+    llm_provider: "openai"
+    cache: true
+    schema_retry: 1
+    batching:
+      max_reviews_llm:
+        translated_non_en: "all"
+        english_sample_per_month_per_star: 200
+  
+  evaluation:
+    manual_audit:
+      enabled: false  # Set to true when manual labels are available
+      sample_size: 200
+      aspects_to_label: ["Battery", "Camera", "Performance/Overheating"]
+    agreement_metrics: ["precision", "recall", "f1"]
+    drift_correlation: true
+  
+  cost_controls:
+    max_api_translate_chars: 5000000
+    max_llm_calls: 25000
+    deduplicate_near_identical_texts: true
+
+governance:
+  privacy: "Do not output raw PII; redact personal names if present."
+  logging:
+    level: "INFO"
+    save_to: "outputs/run_logs.txt"
+
