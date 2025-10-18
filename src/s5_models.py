@@ -244,7 +244,9 @@ def run_s5_models(config_path: str = "config.yaml") -> pd.DataFrame:
     logger.info(f"Loaded {len(df)} reviews for model processing")
     
     # === SiEBERT Overall Sentiment ===
-    if config['config']['sentiment']['transformer_overall']['enabled']:
+    siebert_enabled = config['config']['sentiment']['transformer_overall']['enabled']
+    
+    if siebert_enabled:
         logger.info("Running SiEBERT sentiment analysis...")
         
         model_name = config['config']['sentiment']['transformer_overall']['model']
@@ -265,9 +267,13 @@ def run_s5_models(config_path: str = "config.yaml") -> pd.DataFrame:
         df['siebert_sentiment'] = sentiment_df['sentiment_numeric']
         
         logger.info(f"SiEBERT sentiment distribution: {df['siebert_label'].value_counts().to_dict()}")
+    else:
+        logger.info("SiEBERT sentiment analysis disabled in config")
     
     # === PyABSA Aspect Extraction ===
-    if config['config']['aspects']['pyabsa']['enabled']:
+    pyabsa_enabled = config['config']['aspects']['pyabsa']['enabled']
+    
+    if pyabsa_enabled:
         logger.info("Running PyABSA aspect extraction...")
         
         aspect_catalog = config['config']['aspects']['target_catalog']
@@ -288,6 +294,12 @@ def run_s5_models(config_path: str = "config.yaml") -> pd.DataFrame:
         # Count total aspects found
         total_aspects = sum(len(aspects) for aspects in aspect_extractions)
         logger.info(f"PyABSA extracted {total_aspects} aspect mentions")
+    else:
+        logger.info("PyABSA aspect extraction disabled in config")
+        # Create empty columns for consistency
+        df['aspects_pyabsa_raw'] = [[] for _ in range(len(df))]
+        df['aspects_pyabsa_agg'] = [{} for _ in range(len(df))]
+        total_aspects = 0
     
     # Save processed data
     output_path = Path(config['data']['processed_dir']) / '05_models.parquet'
@@ -304,10 +316,15 @@ def run_s5_models(config_path: str = "config.yaml") -> pd.DataFrame:
     # Summary
     logger.info(f"\nS5 Summary:")
     logger.info(f"  Total reviews: {len(df)}")
-    if 'siebert_label' in df.columns:
+    if siebert_enabled and 'siebert_label' in df.columns:
         logger.info(f"  SiEBERT sentiment: {df['siebert_label'].value_counts().to_dict()}")
-    if 'aspects_pyabsa_raw' in df.columns:
+    else:
+        logger.info(f"  SiEBERT: Disabled in config")
+    
+    if pyabsa_enabled:
         logger.info(f"  PyABSA aspects extracted: {total_aspects} mentions")
+    else:
+        logger.info(f"  PyABSA: Disabled in config")
     
     return df
 

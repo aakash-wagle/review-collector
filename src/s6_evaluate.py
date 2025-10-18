@@ -51,13 +51,28 @@ def compute_sentiment_agreement(df: pd.DataFrame, method1: str, method2: str) ->
     }
 
 
-def compare_aspect_methods(df_baselines: pd.DataFrame, df_models: pd.DataFrame, aspect_catalog: list) -> pd.DataFrame:
+def compare_aspect_methods(df_baselines: pd.DataFrame, df_models: pd.DataFrame, aspect_catalog: list, pyabsa_enabled: bool = True) -> pd.DataFrame:
     """Compare dictionary vs PyABSA aspect extraction."""
     comparison_results = []
     
     for aspect in aspect_catalog:
         # Dictionary: check if aspect in list
         dict_mentions = df_baselines['aspects_dict'].apply(lambda x: aspect in x if isinstance(x, list) else False)
+        
+        if not pyabsa_enabled:
+            # Skip PyABSA comparison if disabled
+            comparison_results.append({
+                'aspect': aspect,
+                'dict_count': dict_mentions.sum(),
+                'pyabsa_count': 0,
+                'both': 0,
+                'dict_only': dict_mentions.sum(),
+                'pyabsa_only': 0,
+                'precision': 0,
+                'recall': 0,
+                'f1': 0
+            })
+            continue
         
         # PyABSA: check if aspect in raw extractions
         def check_pyabsa_aspect(x):
@@ -154,42 +169,51 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     logger.info(f"VADER vs Stars - Accuracy: {vader_metrics['accuracy']:.3f}, F1: {vader_metrics['f1']:.3f}")
     
     # === SiEBERT vs Stars ===
-    logger.info("Evaluating SiEBERT vs Stars...")
-    
-    # Map SiEBERT labels to standard format
-    siebert_label_map = {'NEGATIVE': 'negative', 'NEUTRAL': 'neutral', 'POSITIVE': 'positive'}
-    df_models['siebert_label_mapped'] = df_models['siebert_label'].map(siebert_label_map)
-    
-    siebert_metrics = compute_sentiment_agreement(df_models, 'siebert_label_mapped', 'stars')
-    
-    logger.info(f"SiEBERT vs Stars - Accuracy: {siebert_metrics['accuracy']:.3f}, F1: {siebert_metrics['f1']:.3f}")
-    
-    # Plot SiEBERT vs VADER confusion
-    fig_path = outputs_dir / 'figures' / 'sentiment_confusion_vader_vs_siebert.png'
-    
-    # For this, we need to compare VADER and SiEBERT directly
-    # Merge the dataframes on index
-    df_merged = df_baselines[['vader_label']].join(df_models[['siebert_label_mapped']], how='inner')
-    
-    if len(df_merged) > 0:
-        labels = ['negative', 'neutral', 'positive']
-        cm = confusion_matrix(df_merged['vader_label'], df_merged['siebert_label_mapped'], labels=labels)
+    if config['config']['sentiment']['transformer_overall']['enabled']:
+        logger.info("Evaluating SiEBERT vs Stars...")
         
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels, ax=ax)
-        ax.set_xlabel('SiEBERT Sentiment', fontsize=12)
-        ax.set_ylabel('VADER Sentiment', fontsize=12)
-        ax.set_title('VADER vs SiEBERT Confusion Matrix', fontsize=14, fontweight='bold')
-        plt.tight_layout()
-        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        logger.info(f"VADER vs SiEBERT confusion plot saved to {fig_path}")
+        # Map SiEBERT labels to standard format
+        siebert_label_map = {'NEGATIVE': 'negative', 'NEUTRAL': 'neutral', 'POSITIVE': 'positive'}
+        df_models['siebert_label_mapped'] = df_models['siebert_label'].map(siebert_label_map)
+        
+        siebert_metrics = compute_sentiment_agreement(df_models, 'siebert_label_mapped', 'stars')
+        
+        logger.info(f"SiEBERT vs Stars - Accuracy: {siebert_metrics['accuracy']:.3f}, F1: {siebert_metrics['f1']:.3f}")
+        
+        # Plot SiEBERT vs VADER confusion
+        fig_path = outputs_dir / 'figures' / 'sentiment_confusion_vader_vs_siebert.png'
+        
+        # For this, we need to compare VADER and SiEBERT directly
+        # Merge the dataframes on index
+        df_merged = df_baselines[['vader_label']].join(df_models[['siebert_label_mapped']], how='inner')
+        
+        if len(df_merged) > 0:
+            labels = ['negative', 'neutral', 'positive']
+            cm = confusion_matrix(df_merged['vader_label'], df_merged['siebert_label_mapped'], labels=labels)
+            
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels, ax=ax)
+            ax.set_xlabel('SiEBERT Sentiment', fontsize=12)
+            ax.set_ylabel('VADER Sentiment', fontsize=12)
+            ax.set_title('VADER vs SiEBERT Confusion Matrix', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            logger.info(f"VADER vs SiEBERT confusion plot saved to {fig_path}")
+    else:
+        logger.info("SiEBERT evaluation disabled in config")
+        siebert_metrics = None
     
     # === PyABSA vs Dictionary Aspects ===
-    logger.info("Evaluating PyABSA vs Dictionary aspects...")
+    pyabsa_enabled = config['config']['aspects']['pyabsa']['enabled']
+    
+    if pyabsa_enabled:
+        logger.info("Evaluating PyABSA vs Dictionary aspects...")
+    else:
+        logger.info("PyABSA disabled, skipping PyABSA aspect evaluation...")
     
     aspect_catalog = config['config']['aspects']['target_catalog']
-    aspect_comparison = compare_aspect_methods(df_baselines, df_models, aspect_catalog)
+    aspect_comparison = compare_aspect_methods(df_baselines, df_models, aspect_catalog, pyabsa_enabled)
     
     # Save comparison table
     aspect_table_path = outputs_dir / 'tables' / 'aspect_comparison_pyabsa_vs_dict.csv'
@@ -198,46 +222,51 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     logger.info(f"Aspect comparison saved to {aspect_table_path}")
     
     # Compute PyABSA aspect summary
-    pyabsa_aspect_stats = []
-    for aspect in aspect_catalog:
-        aspect_reviews = []
-        aspect_sentiments = []
-        
-        for idx, aspects in enumerate(df_models['aspects_pyabsa_raw']):
-            # Handle string-serialized aspects (from parquet)
-            if isinstance(aspects, str):
-                import ast
-                try:
-                    aspects = ast.literal_eval(aspects)
-                except:
-                    aspects = []
+    if pyabsa_enabled:
+        pyabsa_aspect_stats = []
+        for aspect in aspect_catalog:
+            aspect_reviews = []
+            aspect_sentiments = []
             
-            if isinstance(aspects, list):
-                for asp in aspects:
-                    if isinstance(asp, dict) and asp.get('aspect') == aspect:
-                        aspect_reviews.append(idx)
-                        aspect_sentiments.append(asp.get('sentiment', 'neutral'))
-        
-        if aspect_reviews:
-            # Get stars for these reviews
-            stars = df_models.loc[aspect_reviews, 'stars_num']
-            neg_share = (stars <= 2).mean() if len(stars) > 0 else 0
+            for idx, aspects in enumerate(df_models['aspects_pyabsa_raw']):
+                # Handle string-serialized aspects (from parquet)
+                if isinstance(aspects, str):
+                    import ast
+                    try:
+                        aspects = ast.literal_eval(aspects)
+                    except:
+                        aspects = []
+                
+                if isinstance(aspects, list):
+                    for asp in aspects:
+                        if isinstance(asp, dict) and asp.get('aspect') == aspect:
+                            aspect_reviews.append(idx)
+                            aspect_sentiments.append(asp.get('sentiment', 'neutral'))
             
-            pyabsa_aspect_stats.append({
-                'aspect': aspect,
-                'count': len(aspect_reviews),
-                'avg_stars': stars.mean() if len(stars) > 0 else 0,
-                'neg_share': neg_share,
-                'neg_count': (stars <= 2).sum() if len(stars) > 0 else 0,
-                'sentiment_dist': pd.Series(aspect_sentiments).value_counts().to_dict() if aspect_sentiments else {}
-            })
-    
-    if pyabsa_aspect_stats:
-        pyabsa_aspect_df = pd.DataFrame(pyabsa_aspect_stats).sort_values('count', ascending=False)
+            if aspect_reviews:
+                # Get stars for these reviews
+                stars = df_models.loc[aspect_reviews, 'stars_num']
+                neg_share = (stars <= 2).mean() if len(stars) > 0 else 0
+                
+                pyabsa_aspect_stats.append({
+                    'aspect': aspect,
+                    'count': len(aspect_reviews),
+                    'avg_stars': stars.mean() if len(stars) > 0 else 0,
+                    'neg_share': neg_share,
+                    'neg_count': (stars <= 2).sum() if len(stars) > 0 else 0,
+                    'sentiment_dist': pd.Series(aspect_sentiments).value_counts().to_dict() if aspect_sentiments else {}
+                })
+        
+        if pyabsa_aspect_stats:
+            pyabsa_aspect_df = pd.DataFrame(pyabsa_aspect_stats).sort_values('count', ascending=False)
+        else:
+            # Create empty DataFrame with expected columns
+            pyabsa_aspect_df = pd.DataFrame(columns=['aspect', 'count', 'avg_stars', 'neg_share', 'neg_count', 'sentiment_dist'])
+            logger.warning("No PyABSA aspects found, creating empty summary")
     else:
-        # Create empty DataFrame with expected columns
+        # Create empty DataFrame when PyABSA is disabled
         pyabsa_aspect_df = pd.DataFrame(columns=['aspect', 'count', 'avg_stars', 'neg_share', 'neg_count', 'sentiment_dist'])
-        logger.warning("No PyABSA aspects found, creating empty summary")
+        logger.info("PyABSA disabled, creating empty summary")
     
     pyabsa_table_path = outputs_dir / 'tables' / 'aspects_summary_pyabsa.csv'
     pyabsa_aspect_df.to_csv(pyabsa_table_path, index=False)
@@ -250,14 +279,16 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
             'precision': vader_metrics['precision'],
             'recall': vader_metrics['recall'],
             'f1': vader_metrics['f1']
-        },
-        'SiEBERT_vs_Stars': {
+        }
+    }
+    
+    if config['config']['sentiment']['transformer_overall']['enabled'] and siebert_metrics is not None:
+        evaluation_metrics['SiEBERT_vs_Stars'] = {
             'accuracy': siebert_metrics['accuracy'],
             'precision': siebert_metrics['precision'],
             'recall': siebert_metrics['recall'],
             'f1': siebert_metrics['f1']
         }
-    }
     
     metrics_df = pd.DataFrame(evaluation_metrics).T
     metrics_table_path = outputs_dir / 'tables' / 'evaluation_metrics.csv'
@@ -266,8 +297,12 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     
     # Merge all data for final output
     df_merged = df_baselines.copy()
-    df_merged['siebert_label'] = df_models['siebert_label']
-    df_merged['siebert_score'] = df_models['siebert_score']
+    if config['config']['sentiment']['transformer_overall']['enabled'] and 'siebert_label' in df_models.columns:
+        df_merged['siebert_label'] = df_models['siebert_label']
+        df_merged['siebert_score'] = df_models['siebert_score']
+        logger.info("SiEBERT columns merged into evaluation data")
+    else:
+        logger.info("SiEBERT columns not included (disabled in config)")
     df_merged['aspects_pyabsa_raw'] = df_models['aspects_pyabsa_raw']
     df_merged['aspects_pyabsa_agg'] = df_models['aspects_pyabsa_agg']
     
@@ -279,7 +314,10 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     # Summary
     logger.info(f"\nS6 Summary:")
     logger.info(f"  VADER vs Stars F1: {vader_metrics['f1']:.3f}")
-    logger.info(f"  SiEBERT vs Stars F1: {siebert_metrics['f1']:.3f}")
+    if siebert_metrics is not None:
+        logger.info(f"  SiEBERT vs Stars F1: {siebert_metrics['f1']:.3f}")
+    else:
+        logger.info(f"  SiEBERT: Disabled in config")
     logger.info(f"  Aspect comparison: {len(aspect_comparison)} aspects analyzed")
     
     return df_merged
