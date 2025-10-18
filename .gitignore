@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Cache & Models
+cache/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.ckpt
+
+# Data (keep structure but ignore large files)
+data/processed/*.parquet
+data/raw/*.csv
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Outputs (generated files)
+outputs/figures/*.png
+outputs/tables/*.csv
+outputs/*.txt
+outputs/*.md
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+run_logs.txt
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+Thumbs.db

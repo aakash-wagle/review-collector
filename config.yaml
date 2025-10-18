@@ -1,0 +1,142 @@
+project:
+  name: "Beats Solo3 Wireless – Multilingual Review Analysis (No-LLM, Local Only)"
+  objective: >
+    Clean, (conditionally) translate, and analyze Google reviews (review_text, stars string)
+    to produce EDA, sentiment (VADER quick scan + SiEBERT accurate overall), aspect insights via
+    PyABSA (DeBERTa-v3), topics, and 3–5 evidence-backed recommendations — all with local models
+    only and zero LLM/API calls. The 'date' column is dropped at ingest and never used.
+
+environment:
+  python: "3.11"
+  venv_required: true
+  models:
+    spacy_model: "en_core_web_sm"
+    overall_sentiment_transformer: "siebert/sentiment-roberta-large-english"
+    translation_local_model: "facebook/m2m100_418M"
+    pyabsa_backend: "deberta-v3-base"
+
+data:
+  raw_csv: "data/raw/reviews.csv"
+  raw_columns: [review_text, stars]
+  optional_columns: [date]
+  processed_dir: "data/processed"
+  outputs_dir: "outputs"
+  cache_dir: "cache"
+
+config:
+  seeds:
+    numpy: 42
+    sklearn: 42
+
+  stars:
+    regex_patterns:
+      - "([0-9]+(?:\\.[0-9]+)?)\\s*out of\\s*([0-9]+(?:\\.[0-9]+)?)"
+      - "\\b([0-9]+(?:\\.[0-9]+)?)/([0-9]+(?:\\.[0-9]+)?)\\b"
+      - "\\b(rated|rating|rates?)\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(stars?)\\b"
+      - "\\b(one|two|three|four|five)\\s*(stars?)\\b"
+    word_to_num_map:
+      one: 1
+      two: 2
+      three: 3
+      four: 4
+      five: 5
+    normalize_to_scale: 5
+    clip_range: [1, 5]
+
+  translation:
+    enabled: true
+    mode: "local"
+    cache: true
+    auto_by_distribution:
+      enabled: true
+      sample_size: 5000
+      non_en_threshold: 0.05
+    back_translation_qc:
+      enabled: true
+      sample_size: 200
+      polarity_flip_flag: true
+
+  normalization:
+    lowercase: true
+    demojize: true
+    strip_urls_html_handles: true
+    expand_contractions: true
+    lemmatize: true
+    low_info_word_threshold: 5
+
+  sentiment:
+    vader:
+      enabled: true
+      thresholds:
+        neg: -0.05
+        pos: 0.05
+    transformer_overall:
+      enabled: true
+      model: "siebert/sentiment-roberta-large-english"
+      label_mapping:
+        NEGATIVE: -1
+        NEUTRAL: 0
+        POSITIVE: 1
+
+  topics:
+    method: "kmeans"
+    tfidf:
+      ngram_range: [1, 2]
+      min_df: 5
+      max_features: 10000
+    kmeans:
+      k_min: 6
+      k_max: 12
+      selection_metric: "silhouette"
+    labeling:
+      method: "heuristic_top_terms"
+      topn_terms: 6
+      label_max_words: 4
+
+  aspects:
+    target_catalog:
+      - Sound/Audio
+      - Comfort/Fit
+      - Battery/Longevity
+      - Connectivity/Bluetooth
+      - Build/Durability
+      - Controls/Buttons
+      - Mic/Calls
+      - Price/Value
+      - Portability/Foldability
+      - Charging/Port
+      - Noise Isolation
+      - Accessories/Case
+      - Other
+    dictionary_match:
+      enabled: true
+    pyabsa:
+      enabled: true
+      backend_model: "deberta-v3-base"
+      granularity: "sentence"
+      output_schema: [aspect, sentiment, evidence_span]
+
+  evaluation:
+    manual_audit:
+      enabled: true
+      sample_size: 200
+      aspects_to_label: [Sound/Audio, Comfort/Fit, Battery/Longevity]
+    agreement_metrics: [precision, recall, f1]
+
+  cost_controls:
+    deduplicate_near_identical_texts: true
+
+quality_gates:
+  min_valid_stars_pct: 0.99
+  max_translation_flip_pct: 0.08
+  require_lang_dist_if_non_en: true
+
+governance:
+  privacy: "Do not output raw PII; redact personal names if present."
+  caching:
+    translation_cache: "cache/translate.sqlite"
+    model_cache: "cache/hf_models"
+  logging:
+    level: "INFO"
+    save_to: "outputs/run_logs.txt"
+
