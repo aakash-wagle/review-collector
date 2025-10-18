@@ -71,7 +71,7 @@ config:
         neg: -0.05
         pos: 0.05
     transformer_overall:
-      enabled: true
+      enabled: false
       model: "siebert/sentiment-roberta-large-english"
       label_mapping:
         NEGATIVE: -1
