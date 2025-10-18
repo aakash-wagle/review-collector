@@ -155,12 +155,71 @@ def plot_text_length_distribution(df: pd.DataFrame, output_path: Path):
     logger.info(f"Text length distribution plot saved to {output_path}")
 
 
-def plot_top_ngrams_negative(df: pd.DataFrame, output_path: Path):
+def plot_top_ngrams_low_ratings(df: pd.DataFrame, output_path: Path):
     """Plot top n-grams in negative reviews (1-2 stars)."""
     from sklearn.feature_extraction.text import CountVectorizer
     
     # Filter negative reviews
     negative_reviews = df[df['stars_num'] <= 2]['text_en_clean'].dropna()
+    
+    if len(negative_reviews) < 10:
+        logger.warning("Not enough low ratings reviews for n-gram analysis")
+        return
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    
+    # Unigrams
+    ax1 = axes[0]
+    vectorizer_1 = CountVectorizer(ngram_range=(1, 1), max_features=15, stop_words='english')
+    unigrams = vectorizer_1.fit_transform(negative_reviews)
+    unigram_counts = unigrams.sum(axis=0).A1
+    unigram_names = vectorizer_1.get_feature_names_out()
+    
+    top_unigrams = sorted(zip(unigram_names, unigram_counts), key=lambda x: x[1], reverse=True)[:15]
+    words, counts = zip(*top_unigrams)
+    
+    ax1.barh(range(len(words)), counts, color='coral')
+    ax1.set_yticks(range(len(words)))
+    ax1.set_yticklabels(words)
+    ax1.set_xlabel('Frequency', fontsize=12)
+    ax1.set_title('Top 15 Words in Low Ratings Reviews (1-2★)', fontsize=13, fontweight='bold')
+    ax1.invert_yaxis()
+    
+    for i, count in enumerate(counts):
+        ax1.text(count + max(counts) * 0.01, i, str(count), va='center', fontsize=9)
+    
+    # Bigrams
+    ax2 = axes[1]
+    vectorizer_2 = CountVectorizer(ngram_range=(2, 2), max_features=15, stop_words='english')
+    bigrams = vectorizer_2.fit_transform(negative_reviews)
+    bigram_counts = bigrams.sum(axis=0).A1
+    bigram_names = vectorizer_2.get_feature_names_out()
+    
+    top_bigrams = sorted(zip(bigram_names, bigram_counts), key=lambda x: x[1], reverse=True)[:15]
+    phrases, counts2 = zip(*top_bigrams)
+    
+    ax2.barh(range(len(phrases)), counts2, color='steelblue')
+    ax2.set_yticks(range(len(phrases)))
+    ax2.set_yticklabels(phrases)
+    ax2.set_xlabel('Frequency', fontsize=12)
+    ax2.set_title('Top 15 Bigrams in Low Ratings (1-2★)', fontsize=13, fontweight='bold')
+    ax2.invert_yaxis()
+    
+    for i, count in enumerate(counts2):
+        ax2.text(count + max(counts2) * 0.01, i, str(count), va='center', fontsize=9)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    logger.info(f"Top n-grams (negative) plot saved to {output_path}")
+
+def plot_top_ngrams_negative(df: pd.DataFrame, output_path: Path):
+    """Plot top n-grams in negative reviews (1-2 stars)."""
+    from sklearn.feature_extraction.text import CountVectorizer
+    
+    # Filter negative reviews
+    negative_reviews = df[df['vader_label'] == "negative"]['text_en_clean'].dropna()
     
     if len(negative_reviews) < 10:
         logger.warning("Not enough negative reviews for n-gram analysis")
@@ -182,7 +241,7 @@ def plot_top_ngrams_negative(df: pd.DataFrame, output_path: Path):
     ax1.set_yticks(range(len(words)))
     ax1.set_yticklabels(words)
     ax1.set_xlabel('Frequency', fontsize=12)
-    ax1.set_title('Top 15 Words in Negative Reviews (1-2★)', fontsize=13, fontweight='bold')
+    ax1.set_title('Top 15 Words in Negative Reviews', fontsize=13, fontweight='bold')
     ax1.invert_yaxis()
     
     for i, count in enumerate(counts):
@@ -202,7 +261,7 @@ def plot_top_ngrams_negative(df: pd.DataFrame, output_path: Path):
     ax2.set_yticks(range(len(phrases)))
     ax2.set_yticklabels(phrases)
     ax2.set_xlabel('Frequency', fontsize=12)
-    ax2.set_title('Top 15 Bigrams in Negative Reviews (1-2★)', fontsize=13, fontweight='bold')
+    ax2.set_title('Top 15 Bigrams in Negative Reviews', fontsize=13, fontweight='bold')
     ax2.invert_yaxis()
     
     for i, count in enumerate(counts2):
@@ -539,10 +598,16 @@ def run_s7_story(config_path: str = "config.yaml"):
     text_len_path = outputs_dir / 'figures' / 'text_length_distribution.png'
     plot_text_length_distribution(df, text_len_path)
     
-    # 8. top_ngrams_negative.png - create now
+    # 8a. top_ngrams_negative.png - create now
+    logger.info("Creating top n-grams in low ratings reviews plot...")
+    ngrams_path = outputs_dir / 'figures' / 'top_ngrams_low_ratings.png'
+    plot_top_ngrams_low_ratings(df, ngrams_path)
+
+    # 8b. top_ngrams_negative.png - create now
     logger.info("Creating top n-grams in negative reviews plot...")
     ngrams_path = outputs_dir / 'figures' / 'top_ngrams_negative.png'
     plot_top_ngrams_negative(df, ngrams_path)
+
     
     # 9. 2D topic cluster visualizations (t-SNE and PCA)
     logger.info("Creating 2D topic cluster visualizations...")
