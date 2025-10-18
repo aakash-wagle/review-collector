@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 def plot_aspect_negative_share(dict_df: pd.DataFrame, pyabsa_df: pd.DataFrame, output_path: Path):
     """Plot negative share comparison for aspects."""
+    # Check if PyABSA data is empty
+    if pyabsa_df.empty or len(pyabsa_df) == 0:
+        logger.warning("PyABSA data is empty, skipping aspect negative share comparison plot")
+        return
+    
     # Merge on aspect
     merged = dict_df[['aspect', 'neg_share']].merge(
         pyabsa_df[['aspect', 'neg_share']], 
@@ -584,9 +589,13 @@ def run_s7_story(config_path: str = "config.yaml"):
         logger.info(f"VADER vs SiEBERT confusion already exists at {vader_siebert_path}")
     
     # 4. aspect_negative_share_pyabsa_vs_dict.png - create now
-    logger.info("Creating aspect negative share comparison plot...")
-    aspect_neg_path = outputs_dir / 'figures' / 'aspect_negative_share_pyabsa_vs_dict.png'
-    plot_aspect_negative_share(dict_aspects, pyabsa_aspects, aspect_neg_path)
+    pyabsa_enabled = config['config']['aspects']['pyabsa']['enabled']
+    if pyabsa_enabled and not pyabsa_aspects.empty:
+        logger.info("Creating aspect negative share comparison plot...")
+        aspect_neg_path = outputs_dir / 'figures' / 'aspect_negative_share_pyabsa_vs_dict.png'
+        plot_aspect_negative_share(dict_aspects, pyabsa_aspects, aspect_neg_path)
+    else:
+        logger.info("PyABSA disabled or no data, skipping aspect negative share comparison plot")
     
     # 5. topic_clusters_with_auto_labels.png - create now
     logger.info("Creating topic clusters plot...")

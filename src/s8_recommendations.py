@@ -19,64 +19,86 @@ class RecommendationEngine:
         self.dict_aspects = dict_aspects
         self.pyabsa_aspects = pyabsa_aspects
     
-    def rank_problem_aspects(self, top_n: int = 5) -> List[Dict]:
+    def rank_problem_aspects(self, top_n: int = 5, pyabsa_enabled: bool = True) -> List[Dict]:
         """Rank aspects by problem severity (negative share + support)."""
-        # Combine both methods, weighted by PyABSA
         aspects_ranked = []
         
-        for _, row in self.pyabsa_aspects.iterrows():
-            aspect = row['aspect']
-            
-            # Find corresponding dict data
-            dict_row = self.dict_aspects[self.dict_aspects['aspect'] == aspect]
-            
-            pyabsa_neg_share = row['neg_share']
-            pyabsa_count = row['count']
-            
-            dict_neg_share = dict_row['neg_share'].iloc[0] if len(dict_row) > 0 else 0
-            dict_count = dict_row['count'].iloc[0] if len(dict_row) > 0 else 0
-            
-            # Compute severity score: weighted avg of neg_share * support
-            severity = (pyabsa_neg_share * 0.6 + dict_neg_share * 0.4) * np.log(pyabsa_count + dict_count + 1)
-            
-            aspects_ranked.append({
-                'aspect': aspect,
-                'severity': severity,
-                'pyabsa_neg_share': pyabsa_neg_share,
-                'dict_neg_share': dict_neg_share,
-                'pyabsa_count': pyabsa_count,
-                'dict_count': dict_count,
-                'avg_stars': row['avg_stars']
-            })
+        if pyabsa_enabled and not self.pyabsa_aspects.empty:
+            # Combine both methods, weighted by PyABSA
+            for _, row in self.pyabsa_aspects.iterrows():
+                aspect = row['aspect']
+                
+                # Find corresponding dict data
+                dict_row = self.dict_aspects[self.dict_aspects['aspect'] == aspect]
+                
+                pyabsa_neg_share = row['neg_share']
+                pyabsa_count = row['count']
+                
+                dict_neg_share = dict_row['neg_share'].iloc[0] if len(dict_row) > 0 else 0
+                dict_count = dict_row['count'].iloc[0] if len(dict_row) > 0 else 0
+                
+                # Compute severity score: weighted avg of neg_share * support
+                severity = (pyabsa_neg_share * 0.6 + dict_neg_share * 0.4) * np.log(pyabsa_count + dict_count + 1)
+                
+                aspects_ranked.append({
+                    'aspect': aspect,
+                    'severity': severity,
+                    'pyabsa_neg_share': pyabsa_neg_share,
+                    'dict_neg_share': dict_neg_share,
+                    'pyabsa_count': pyabsa_count,
+                    'dict_count': dict_count,
+                    'avg_stars': row.get('avg_stars', 0)
+                })
+        else:
+            # Use dictionary method only when PyABSA is disabled
+            logger.info("PyABSA disabled, using dictionary method only for aspect ranking")
+            for _, row in self.dict_aspects.iterrows():
+                aspect = row['aspect']
+                dict_neg_share = row['neg_share']
+                dict_count = row['count']
+                
+                # Compute severity score using dictionary only
+                severity = dict_neg_share * np.log(dict_count + 1)
+                
+                aspects_ranked.append({
+                    'aspect': aspect,
+                    'severity': severity,
+                    'pyabsa_neg_share': 0,
+                    'dict_neg_share': dict_neg_share,
+                    'pyabsa_count': 0,
+                    'dict_count': dict_count,
+                    'avg_stars': row.get('avg_stars', 0)
+                })
         
         # Sort by severity
         aspects_ranked = sorted(aspects_ranked, key=lambda x: x['severity'], reverse=True)
         
         return aspects_ranked[:top_n]
     
-    def extract_evidence(self, aspect: str, sentiment: str = 'negative', max_examples: int = 3) -> List[str]:
+    def extract_evidence(self, aspect: str, sentiment: str = 'negative', max_examples: int = 3, pyabsa_enabled: bool = True) -> List[str]:
         """Extract evidence quotes for an aspect."""
         evidence = []
         
-        # Find reviews mentioning this aspect with negative sentiment
-        for idx, aspects_raw in enumerate(self.df['aspects_pyabsa_raw']):
-            if not isinstance(aspects_raw, list):
-                continue
-            
-            for asp in aspects_raw:
-                if asp['aspect'] == aspect and asp['sentiment'] == sentiment:
-                    # Get the evidence span
-                    evidence_text = asp.get('evidence_span', '')
-                    if evidence_text and len(evidence_text) > 10:
-                        evidence.append(evidence_text.strip())
-                    
-                    if len(evidence) >= max_examples:
-                        break
-            
-            if len(evidence) >= max_examples:
-                break
+        # Find reviews mentioning this aspect with negative sentiment (PyABSA)
+        if pyabsa_enabled and 'aspects_pyabsa_raw' in self.df.columns:
+            for idx, aspects_raw in enumerate(self.df['aspects_pyabsa_raw']):
+                if not isinstance(aspects_raw, list):
+                    continue
+                
+                for asp in aspects_raw:
+                    if isinstance(asp, dict) and asp.get('aspect') == aspect and asp.get('sentiment') == sentiment:
+                        # Get the evidence span
+                        evidence_text = asp.get('evidence_span', '')
+                        if evidence_text and len(evidence_text) > 10:
+                            evidence.append(evidence_text.strip())
+                        
+                        if len(evidence) >= max_examples:
+                            break
+                
+                if len(evidence) >= max_examples:
+                    break
         
-        # Fallback to dictionary-based extraction if PyABSA didn't find enough
+        # Fallback to dictionary-based extraction if PyABSA is disabled or didn't find enough
         if len(evidence) < max_examples:
             # Find reviews with low stars mentioning this aspect
             aspect_reviews = self.df[
@@ -109,15 +131,16 @@ class RecommendationEngine:
         }
         return keyword_map.get(aspect, [aspect.lower()])
     
-    def generate_recommendation(self, aspect_data: Dict) -> Dict:
+    def generate_recommendation(self, aspect_data: Dict, pyabsa_enabled: bool = True) -> Dict:
         """Generate a recommendation for an aspect."""
         aspect = aspect_data['aspect']
-        neg_share = aspect_data['pyabsa_neg_share']
-        count = aspect_data['pyabsa_count']
+        # Use PyABSA data if available, otherwise fall back to dict data
+        neg_share = aspect_data['pyabsa_neg_share'] if pyabsa_enabled else aspect_data['dict_neg_share']
+        count = aspect_data['pyabsa_count'] if pyabsa_enabled else aspect_data['dict_count']
         avg_stars = aspect_data['avg_stars']
         
         # Extract evidence
-        evidence_quotes = self.extract_evidence(aspect, sentiment='negative', max_examples=2)
+        evidence_quotes = self.extract_evidence(aspect, sentiment='negative', max_examples=2, pyabsa_enabled=pyabsa_enabled)
         
         # Generate finding, recommendation, and metric
         finding = self._generate_finding(aspect, neg_share, count, avg_stars)
@@ -200,6 +223,8 @@ def run_s8_recommendations(config_path: str = "config.yaml"):
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     
+    pyabsa_enabled = config['config']['aspects']['pyabsa']['enabled']
+    
     # Load data
     df = pd.read_parquet(Path(config['data']['processed_dir']) / '06_evaluation.parquet')
     
@@ -208,19 +233,23 @@ def run_s8_recommendations(config_path: str = "config.yaml"):
     pyabsa_aspects = pd.read_csv(outputs_dir / 'tables' / 'aspects_summary_pyabsa.csv')
     
     logger.info(f"Loaded {len(df)} reviews for recommendation generation")
+    if pyabsa_enabled:
+        logger.info("PyABSA enabled: Using combined PyABSA + dictionary ranking")
+    else:
+        logger.info("PyABSA disabled: Using dictionary-only ranking")
     
     # Initialize engine
     engine = RecommendationEngine(df, dict_aspects, pyabsa_aspects)
     
     # Rank problem aspects
     logger.info("Ranking problem aspects...")
-    top_aspects = engine.rank_problem_aspects(top_n=5)
+    top_aspects = engine.rank_problem_aspects(top_n=5, pyabsa_enabled=pyabsa_enabled)
     
     # Generate recommendations
     logger.info("Generating recommendations...")
     recommendations = []
     for aspect_data in top_aspects:
-        rec = engine.generate_recommendation(aspect_data)
+        rec = engine.generate_recommendation(aspect_data, pyabsa_enabled=pyabsa_enabled)
         recommendations.append(rec)
         logger.info(f"Generated recommendation for: {rec['aspect']}")
     
