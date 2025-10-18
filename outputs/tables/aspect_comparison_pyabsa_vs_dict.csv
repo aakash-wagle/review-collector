@@ -1,0 +1,14 @@
+aspect,dict_count,pyabsa_count,both,dict_only,pyabsa_only,precision,recall,f1
+Sound/Audio,0,0,0,0,0,0,0,0
+Comfort/Fit,0,0,0,0,0,0,0,0
+Battery/Longevity,0,0,0,0,0,0,0,0
+Connectivity/Bluetooth,0,0,0,0,0,0,0,0
+Build/Durability,0,0,0,0,0,0,0,0
+Controls/Buttons,0,0,0,0,0,0,0,0
+Mic/Calls,0,0,0,0,0,0,0,0
+Price/Value,0,0,0,0,0,0,0,0
+Portability/Foldability,0,0,0,0,0,0,0,0
+Charging/Port,0,0,0,0,0,0,0,0
+Noise Isolation,0,0,0,0,0,0,0,0
+Accessories/Case,0,0,0,0,0,0,0,0
+Other,0,0,0,0,0,0,0,0
