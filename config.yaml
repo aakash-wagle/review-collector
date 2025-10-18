@@ -111,7 +111,7 @@ config:
     dictionary_match:
       enabled: true
     pyabsa:
-      enabled: true
+      enabled: false
       backend_model: "deberta-v3-base"
       granularity: "sentence"
       output_schema: [aspect, sentiment, evidence_span]
