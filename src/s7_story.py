@@ -615,8 +615,11 @@ def run_s7_story(config_path: str = "config.yaml"):
     plot_topic_clusters_2d(df, topics_summary, outputs_dir / 'figures')
     
     # 10. SiEBERT agreement analysis
-    logger.info("Creating SiEBERT agreement analysis...")
-    plot_siebert_agreement(df, outputs_dir / 'figures')
+    if config['config']['sentiment']['transformer_overall']['enabled']:
+        logger.info("Creating SiEBERT agreement analysis...")
+        plot_siebert_agreement(df, outputs_dir / 'figures')
+    else:
+        logger.info("SiEBERT agreement analysis disabled in config")
     
     # === Verify Required Tables ===
     required_tables = [
