@@ -407,6 +407,11 @@ def plot_siebert_agreement(df: pd.DataFrame, output_dir: Path):
     """Create SiEBERT vs Stars agreement analysis with error examples."""
     logger.info("Creating SiEBERT agreement analysis...")
     
+    # Check if SiEBERT columns exist
+    if 'siebert_label' not in df.columns:
+        logger.warning("SiEBERT columns not found in dataframe, skipping agreement analysis")
+        return
+    
     # Map stars to sentiment
     def stars_to_sentiment(stars):
         if stars <= 2:

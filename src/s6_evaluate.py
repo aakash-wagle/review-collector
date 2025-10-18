@@ -154,40 +154,40 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     logger.info(f"VADER vs Stars - Accuracy: {vader_metrics['accuracy']:.3f}, F1: {vader_metrics['f1']:.3f}")
     
     # === SiEBERT vs Stars ===
-    logger.info("Evaluating SiEBERT vs Stars...")
-    
-    # Map SiEBERT labels to standard format
     if config['config']['sentiment']['transformer_overall']['enabled']:
+        logger.info("Evaluating SiEBERT vs Stars...")
+        
+        # Map SiEBERT labels to standard format
         siebert_label_map = {'NEGATIVE': 'negative', 'NEUTRAL': 'neutral', 'POSITIVE': 'positive'}
         df_models['siebert_label_mapped'] = df_models['siebert_label'].map(siebert_label_map)
         
         siebert_metrics = compute_sentiment_agreement(df_models, 'siebert_label_mapped', 'stars')
-    else:
-        logger.info("SiEBERT agreement analysis disabled in config")
-        siebert_metrics = None
-    
-    logger.info(f"SiEBERT vs Stars - Accuracy: {siebert_metrics['accuracy']:.3f}, F1: {siebert_metrics['f1']:.3f}")
-    
-    # Plot SiEBERT vs VADER confusion
-    fig_path = outputs_dir / 'figures' / 'sentiment_confusion_vader_vs_siebert.png'
-    
-    # For this, we need to compare VADER and SiEBERT directly
-    # Merge the dataframes on index
-    df_merged = df_baselines[['vader_label']].join(df_models[['siebert_label_mapped']], how='inner')
-    
-    if len(df_merged) > 0 and siebert_metrics is not None:
-        labels = ['negative', 'neutral', 'positive']
-        cm = confusion_matrix(df_merged['vader_label'], df_merged['siebert_label_mapped'], labels=labels)
         
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels, ax=ax)
-        ax.set_xlabel('SiEBERT Sentiment', fontsize=12)
-        ax.set_ylabel('VADER Sentiment', fontsize=12)
-        ax.set_title('VADER vs SiEBERT Confusion Matrix', fontsize=14, fontweight='bold')
-        plt.tight_layout()
-        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        logger.info(f"VADER vs SiEBERT confusion plot saved to {fig_path}")
+        logger.info(f"SiEBERT vs Stars - Accuracy: {siebert_metrics['accuracy']:.3f}, F1: {siebert_metrics['f1']:.3f}")
+        
+        # Plot SiEBERT vs VADER confusion
+        fig_path = outputs_dir / 'figures' / 'sentiment_confusion_vader_vs_siebert.png'
+        
+        # For this, we need to compare VADER and SiEBERT directly
+        # Merge the dataframes on index
+        df_merged = df_baselines[['vader_label']].join(df_models[['siebert_label_mapped']], how='inner')
+        
+        if len(df_merged) > 0:
+            labels = ['negative', 'neutral', 'positive']
+            cm = confusion_matrix(df_merged['vader_label'], df_merged['siebert_label_mapped'], labels=labels)
+            
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels, ax=ax)
+            ax.set_xlabel('SiEBERT Sentiment', fontsize=12)
+            ax.set_ylabel('VADER Sentiment', fontsize=12)
+            ax.set_title('VADER vs SiEBERT Confusion Matrix', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            logger.info(f"VADER vs SiEBERT confusion plot saved to {fig_path}")
+    else:
+        logger.info("SiEBERT evaluation disabled in config")
+        siebert_metrics = None
     
     # === PyABSA vs Dictionary Aspects ===
     logger.info("Evaluating PyABSA vs Dictionary aspects...")
@@ -254,14 +254,16 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
             'precision': vader_metrics['precision'],
             'recall': vader_metrics['recall'],
             'f1': vader_metrics['f1']
-        },
-        'SiEBERT_vs_Stars': {
+        }
+    }
+    
+    if config['config']['sentiment']['transformer_overall']['enabled'] and siebert_metrics is not None:
+        evaluation_metrics['SiEBERT_vs_Stars'] = {
             'accuracy': siebert_metrics['accuracy'],
             'precision': siebert_metrics['precision'],
             'recall': siebert_metrics['recall'],
             'f1': siebert_metrics['f1']
         }
-    }
     
     metrics_df = pd.DataFrame(evaluation_metrics).T
     metrics_table_path = outputs_dir / 'tables' / 'evaluation_metrics.csv'
@@ -270,12 +272,12 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     
     # Merge all data for final output
     df_merged = df_baselines.copy()
-    if config['config']['sentiment']['transformer_overall']['enabled']:
+    if config['config']['sentiment']['transformer_overall']['enabled'] and 'siebert_label' in df_models.columns:
         df_merged['siebert_label'] = df_models['siebert_label']
         df_merged['siebert_score'] = df_models['siebert_score']
-        logger.info("SiEBERT agreement analysis enabled in config")
+        logger.info("SiEBERT columns merged into evaluation data")
     else:
-        logger.info("SiEBERT agreement analysis disabled in config")
+        logger.info("SiEBERT columns not included (disabled in config)")
     df_merged['aspects_pyabsa_raw'] = df_models['aspects_pyabsa_raw']
     df_merged['aspects_pyabsa_agg'] = df_models['aspects_pyabsa_agg']
     
@@ -287,7 +289,10 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     # Summary
     logger.info(f"\nS6 Summary:")
     logger.info(f"  VADER vs Stars F1: {vader_metrics['f1']:.3f}")
-    logger.info(f"  SiEBERT vs Stars F1: {siebert_metrics['f1']:.3f}")
+    if siebert_metrics is not None:
+        logger.info(f"  SiEBERT vs Stars F1: {siebert_metrics['f1']:.3f}")
+    else:
+        logger.info(f"  SiEBERT: Disabled in config")
     logger.info(f"  Aspect comparison: {len(aspect_comparison)} aspects analyzed")
     
     return df_merged
