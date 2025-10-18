@@ -157,10 +157,14 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     logger.info("Evaluating SiEBERT vs Stars...")
     
     # Map SiEBERT labels to standard format
-    siebert_label_map = {'NEGATIVE': 'negative', 'NEUTRAL': 'neutral', 'POSITIVE': 'positive'}
-    df_models['siebert_label_mapped'] = df_models['siebert_label'].map(siebert_label_map)
-    
-    siebert_metrics = compute_sentiment_agreement(df_models, 'siebert_label_mapped', 'stars')
+    if config['config']['sentiment']['transformer_overall']['enabled']:
+        siebert_label_map = {'NEGATIVE': 'negative', 'NEUTRAL': 'neutral', 'POSITIVE': 'positive'}
+        df_models['siebert_label_mapped'] = df_models['siebert_label'].map(siebert_label_map)
+        
+        siebert_metrics = compute_sentiment_agreement(df_models, 'siebert_label_mapped', 'stars')
+    else:
+        logger.info("SiEBERT agreement analysis disabled in config")
+        siebert_metrics = None
     
     logger.info(f"SiEBERT vs Stars - Accuracy: {siebert_metrics['accuracy']:.3f}, F1: {siebert_metrics['f1']:.3f}")
     
@@ -171,7 +175,7 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     # Merge the dataframes on index
     df_merged = df_baselines[['vader_label']].join(df_models[['siebert_label_mapped']], how='inner')
     
-    if len(df_merged) > 0:
+    if len(df_merged) > 0 and siebert_metrics is not None:
         labels = ['negative', 'neutral', 'positive']
         cm = confusion_matrix(df_merged['vader_label'], df_merged['siebert_label_mapped'], labels=labels)
         
@@ -266,8 +270,12 @@ def run_s6_evaluate(config_path: str = "config.yaml") -> pd.DataFrame:
     
     # Merge all data for final output
     df_merged = df_baselines.copy()
-    df_merged['siebert_label'] = df_models['siebert_label']
-    df_merged['siebert_score'] = df_models['siebert_score']
+    if config['config']['sentiment']['transformer_overall']['enabled']:
+        df_merged['siebert_label'] = df_models['siebert_label']
+        df_merged['siebert_score'] = df_models['siebert_score']
+        logger.info("SiEBERT agreement analysis enabled in config")
+    else:
+        logger.info("SiEBERT agreement analysis disabled in config")
     df_merged['aspects_pyabsa_raw'] = df_models['aspects_pyabsa_raw']
     df_merged['aspects_pyabsa_agg'] = df_models['aspects_pyabsa_agg']
     
