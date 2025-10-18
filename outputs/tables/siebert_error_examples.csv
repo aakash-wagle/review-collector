@@ -1,0 +1,16 @@
+Error_Type,Stars,Star_Sentiment,SiEBERT_Prediction,SiEBERT_Confidence,Review_Text
+False Negative,5,Positive,Negative,1.000,"so very disappointed buying these in store loudly_crying_face . i had originally ordered these online and seen the additional offers of included apple tv, apple music, so i thought the offers would ap..."
+False Negative,4,Positive,Negative,1.000,"i use to have these and use them to work out. kinda disappointed how long they last, only had them for 6 months then the battery kept dying really fast and the bass blew up. sound quality was good whe..."
+False Negative,5,Positive,Negative,1.000,"i’ve wanted a pair of these for awhile cuz i literally listen to music 24/7 no matter where i’ll have it playing either over my bluetooth speaker, my bluetooth sound bars, or if i’m out an about i hav..."
+False Negative,5,Positive,Negative,1.000,someone opened the bottom of the box to see what was inside of the package. very disappointing.
+False Negative,4,Positive,Negative,1.000,the usb that plugs into my beats headphones into my computer broke within less then a month. of purchasing my headphones .i could only hear one side clearly. the warranty is only 30 days for return. i...
+False Positive,2,Negative,Positive,0.999,works smoothly right out of the box. good attention to detail. everything works seamlessly. i would recommend this. exactly what i needed. everything functions properly. the features are well thought ...
+False Positive,2,Negative,Positive,0.999,everything works seamlessly. i would recommend this. exactly what i needed. everything functions properly. highly functional and well-designed. delivery was prompt. product performs as expected. very ...
+False Positive,2,Negative,Positive,0.999,setup took less than five minutes. runs smoothly. reliable and efficient. matches the product listing. feels sturdy and dependable. met all expectations.
+False Positive,1,Negative,Positive,0.999,puts out amazing sound and have noise cancellation! we use them in our house hold. cant live without them ! they are so comfortable and adorable!
+False Positive,1,Negative,Positive,0.999,"easy to use and set up. sound quality is amazing. they fit well and are comfortable. look great too, love the red!"
+False Positive,1,Negative,Positive,0.999,"shipping was faster than expected. fire everything works like it should. package runs good, no problems at all. looks clean, feels solid. check_mark_button"
+False Positive,2,Negative,Positive,0.999,"really like these, the colors are really nice and they fit snug - after a few months connecting with bluetooth does start to glitch and the sound leaks a bit"
+False Positive,2,Negative,Positive,0.999,"good points: bought them for a present the person said they were very good , nice to be able to walk around listening to music"
+False Positive,2,Negative,Positive,0.999,i am trying to get a hold of the insurance for the beats headphones. i purchased the insurance just in case we would need it and we do overall they are great except for one side do not work. it is bee...
+False Positive,2,Negative,Positive,0.999,my daughter said that the headphones were uncomfortable but loved the rose gold color and sleek look!
