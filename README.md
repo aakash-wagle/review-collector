@@ -83,6 +83,102 @@ python -m spacy download en_core_web_sm
 
 ---
 
+## Data Collection & Scraping
+
+The project includes tools for collecting Google reviews data and performing exploratory data analysis. These scripts are located in the `scraper/` directory.
+
+### Prerequisites for Scraping
+
+```bash
+# Install scraping dependencies
+cd scraper/
+pip install -r requirements.txt
+
+# Install Chrome WebDriver (for scraper.py)
+# On macOS with Homebrew:
+brew install chromedriver
+
+# On Ubuntu/Debian:
+sudo apt-get install chromium-chromedriver
+
+# On Windows: Download from https://chromedriver.chromium.org/
+```
+
+### Scraping Scripts
+
+#### 1. **scraper.py** - Google Reviews Scraper
+Automated web scraping of Google product reviews using Selenium WebDriver.
+
+```bash
+cd scraper/
+python scraper.py
+```
+
+**Features:**
+- Scrapes Google reviews for configurable products
+- Handles pagination automatically
+- Saves data incrementally (every 1000 reviews)
+- Runs in headless mode by default
+- Output: `../data/raw/reviews.csv`
+
+**Configuration:**
+- Edit `PRODUCT` variable to scrape different products
+- Adjust `SAVE_INTERVAL` for checkpoint frequency
+- Modify `MAX_BUTTON_CLICKS` for pagination depth
+
+#### 2. **extract_reviews_from_html.py** - HTML Parser
+Fallback tool to extract reviews from saved HTML dumps if scraping is interrupted.
+
+```bash
+cd scraper/
+python extract_reviews_from_html.py
+```
+
+**Requirements:**
+- Place HTML file as `test.html` in scraper directory
+- Output: `../data/raw/reviews.csv`
+
+#### 3. **eda.py** - Exploratory Data Analysis
+Comprehensive analysis of scraped review data with visualizations.
+
+```bash
+cd scraper/
+python eda.py
+```
+
+**Features:**
+- Rating distribution analysis
+- Text length and word count analysis
+- Temporal analysis of reviews
+- Text content analysis with word clouds
+- Correlation analysis
+- Data preprocessing and cleaning
+- Generates 6 visualization files (PNG)
+- Output: `../data/raw/extracted_reviews_preprocessed.csv`
+
+**Generated Visualizations:**
+- `rating_analysis.png` - Rating distribution charts
+- `text_analysis.png` - Text length analysis
+- `temporal_analysis.png` - Reviews over time
+- `text_content_analysis.png` - Word clouds and keywords
+- `correlation_analysis.png` - Variable correlations
+- `summary_statistics.png` - Summary statistics table
+
+### Workflow
+
+1. **Collect Data**: Run `scraper.py` to gather reviews
+2. **Analyze Data**: Run `eda.py` for comprehensive analysis
+3. **Process Pipeline**: Use main pipeline (`python main.py`) for advanced NLP analysis
+
+### Troubleshooting Scraping
+
+- **ChromeDriver Issues**: Ensure ChromeDriver version matches your Chrome browser
+- **Rate Limiting**: Scraper includes random delays; increase if needed
+- **Memory Issues**: Reduce `SAVE_INTERVAL` for more frequent saves
+- **Interrupted Scraping**: Use `extract_reviews_from_html.py` with saved HTML
+
+---
+
 ## Usage
 
 ### Run Complete Pipeline
