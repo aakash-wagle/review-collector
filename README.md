@@ -28,6 +28,13 @@ A complete, production-ready pipeline for analyzing multilingual product reviews
 │   ├── raw/                # Input: reviews.csv
 │   └── processed/          # Intermediate parquet files (01-06)
 │
+├── scraper/
+│   ├── scraper.py          # Google Reviews web scraper (Selenium)
+│   ├── eda.py              # Exploratory data analysis & visualizations
+│   ├── extract_reviews_from_html.py # HTML parser fallback tool
+│   ├── requirements.txt   # Scraping dependencies
+│   └── *.png              # Generated visualization files
+│
 ├── src/
 │   ├── s1_ingest.py        # Data ingestion, language detection, star parsing
 │   ├── s2_translate.py     # Conditional translation (M2M100)
